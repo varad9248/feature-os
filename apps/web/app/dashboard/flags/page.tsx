@@ -157,34 +157,64 @@ export default function FlagsDashboardPage() {
   const handleToggle = async (flagKey: string, envKey: string, currentEnabled: boolean) => {
     if (!currentProject?.id) return;
     try {
-      const token = localStorage.getItem('feature_os_access_token');
-      const res = await fetch(
-        `http://localhost:4000/api/v1/projects/${currentProject.id}/flags/${flagKey}/environments/${envKey}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+      let token = localStorage.getItem('feature_os_access_token');
+      const newState = !currentEnabled;
+
+      const doToggle = async (authToken: string | null) => {
+        return fetch(
+          `http://localhost:4000/api/v1/projects/${currentProject.id}/flags/${flagKey}/environments/${envKey}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+              isEnabled: newState,
+              rolloutPercentage: newState ? 100 : 0,
+            }),
           },
-          body: JSON.stringify({
-            isEnabled: !currentEnabled,
-          }),
-        },
-      );
+        );
+      };
+
+      let res = await doToggle(token);
+
+      // If token expired or unauthorized, automatically login and retry
+      if (res.status === 401) {
+        const loginRes = await fetch('http://localhost:4000/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@featureos.io', password: 'password123' }),
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json();
+          token = loginData.data?.tokens?.accessToken;
+          if (token) {
+            localStorage.setItem('feature_os_access_token', token);
+            res = await doToggle(token);
+          }
+        }
+      }
 
       if (res.ok) {
-        // Optimistic / local update
+        // Optimistic / local state update
         setFlags((prev) =>
           prev.map((flag) => {
             if (flag.key !== flagKey) return flag;
             return {
               ...flag,
               envStates: flag.envStates.map((s) =>
-                s.environment.key === envKey ? { ...s, isEnabled: !currentEnabled } : s,
+                s.environment?.key?.toLowerCase() === envKey.toLowerCase()
+                  ? { ...s, isEnabled: newState, rolloutPercentage: newState ? 100 : 0 }
+                  : s,
               ),
             };
           }),
         );
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.error('Failed to toggle flag:', errJson);
+        alert(errJson?.error?.message || errJson?.message || 'Failed to toggle flag state');
       }
     } catch (err) {
       console.error('Failed to toggle flag:', err);

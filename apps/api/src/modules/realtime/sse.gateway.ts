@@ -61,7 +61,7 @@ export class SSEGateway {
     };
 
     this.clients.set(clientId, client);
-    logger.info(
+    logger.debug(
       { clientId, environmentId, totalClients: this.clients.size },
       'SSE client connected'
     );
@@ -102,7 +102,7 @@ export class SSEGateway {
     if (!client) return;
 
     this.clients.delete(clientId);
-    logger.info(
+    logger.debug(
       { clientId, environmentId: client.environmentId, remainingClients: this.clients.size },
       'SSE client disconnected'
     );

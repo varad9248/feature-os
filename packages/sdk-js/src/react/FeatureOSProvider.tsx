@@ -51,6 +51,7 @@ export const FeatureOSProvider: React.FC<FeatureOSProviderProps> = ({
 
     return () => {
       isMounted = false;
+      client.destroy();
     };
   }, [client]);
 

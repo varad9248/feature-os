@@ -264,12 +264,14 @@ export class FeatureOSClient {
 
   private connectRealtimeStream(): void {
     if (typeof EventSource === 'undefined') return;
+    if (this.sseSource && this.sseSource.readyState !== EventSource.CLOSED) return;
 
     try {
       const streamUrl = `${this.baseUrl}/api/v1/stream?apiKey=${encodeURIComponent(this.apiKey)}`;
-      this.sseSource = new EventSource(streamUrl);
+      const source = new EventSource(streamUrl);
+      this.sseSource = source;
 
-      this.sseSource.addEventListener('flag_update', (event: MessageEvent) => {
+      source.addEventListener('flag_update', (event: MessageEvent) => {
         try {
           const streamEvent = JSON.parse(event.data) as StreamEvent<{ flagKey: string }>;
           // Refetch flags for the current context to recalculate sticky rules and rollouts cleanly
@@ -279,19 +281,23 @@ export class FeatureOSClient {
         }
       });
 
-      this.sseSource.addEventListener('full_sync', () => {
+      source.addEventListener('full_sync', () => {
         void this.fetchFlags();
       });
 
-      this.sseSource.onerror = () => {
-        if (this.sseSource) {
-          this.sseSource.close();
-          this.sseSource = null;
+      source.onerror = () => {
+        if (source.readyState === EventSource.CLOSED) {
+          source.close();
+          if (this.sseSource === source) {
+            this.sseSource = null;
+          }
+          if (!this.sseReconnectTimeout) {
+            this.sseReconnectTimeout = setTimeout(() => {
+              this.sseReconnectTimeout = null;
+              this.connectRealtimeStream();
+            }, 5000);
+          }
         }
-        // Reconnect after 3 seconds
-        this.sseReconnectTimeout = setTimeout(() => {
-          this.connectRealtimeStream();
-        }, 3000);
       };
     } catch {
       // Suppress connection failure, client continues in offline mode

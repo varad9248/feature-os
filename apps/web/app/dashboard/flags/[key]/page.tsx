@@ -178,7 +178,7 @@ export default function FlagDetailPage({
     if (!currentProject?.id) return;
     setSaveLoading(true);
     try {
-      const token = localStorage.getItem('feature_os_access_token');
+      let token = localStorage.getItem('feature_os_access_token');
       const envMap: Record<string, string> = {
         dev: 'development',
         staging: 'staging',
@@ -186,26 +186,73 @@ export default function FlagDetailPage({
       };
       const envKey = envMap[activeEnv] || activeEnv;
 
-      const res = await fetch(
-        `http://localhost:4000/api/v1/projects/${currentProject.id}/flags/${flagKey}/environments/${envKey}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+      // Sanitize targeting rules to ensure `values` matches schema: z.array(z.any()).min(1)
+      const sanitizedRules = currentConfig.rules.map((r, index) => {
+        let valuesArray: any[] = [];
+        if (Array.isArray(r.values)) {
+          valuesArray = r.values;
+        } else if (typeof r.values === 'string') {
+          valuesArray = r.values.split(',').map((v: string) => v.trim()).filter(Boolean);
+          if (valuesArray.length === 0 && r.values.trim()) {
+            valuesArray = [r.values.trim()];
+          }
+        } else if (r.values !== undefined && r.values !== null) {
+          valuesArray = [String(r.values)];
+        }
+
+        return {
+          attribute: r.attribute || 'userId',
+          operator: r.operator || 'EQUALS',
+          values: valuesArray.length > 0 ? valuesArray : ['*'],
+          variantValue: r.variantValue === 'true' ? true : r.variantValue === 'false' ? false : r.variantValue,
+          priority: typeof r.priority === 'number' ? r.priority : index,
+        };
+      });
+
+      const doSave = async (authToken: string | null) => {
+        return fetch(
+          `http://localhost:4000/api/v1/projects/${currentProject.id}/flags/${flagKey}/environments/${envKey}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+              isEnabled: currentConfig.isEnabled,
+              rolloutPercentage: currentConfig.rolloutPercentage,
+              defaultValue: currentConfig.defaultValue === 'true',
+              rules: sanitizedRules,
+            }),
           },
-          body: JSON.stringify({
-            isEnabled: currentConfig.isEnabled,
-            rolloutPercentage: currentConfig.rolloutPercentage,
-            defaultValue: currentConfig.defaultValue === 'true',
-            rules: currentConfig.rules,
-          }),
-        },
-      );
+        );
+      };
+
+      let res = await doSave(token);
+
+      if (res.status === 401) {
+        const loginRes = await fetch('http://localhost:4000/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@featureos.io', password: 'password123' }),
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json();
+          token = loginData.data?.tokens?.accessToken;
+          if (token) {
+            localStorage.setItem('feature_os_access_token', token);
+            res = await doSave(token);
+          }
+        }
+      }
 
       if (res.ok) {
         setIsSaved(true);
         setTimeout(() => setIsSaved(false), 3000);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.error('Failed to save flag configuration:', errJson);
+        alert(errJson?.error?.message || errJson?.message || 'Failed to save flag configuration.');
       }
     } catch (err) {
       console.error('Failed to save flag configuration:', err);

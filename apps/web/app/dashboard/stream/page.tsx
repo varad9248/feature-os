@@ -101,7 +101,7 @@ export default function RealtimeStreamPage() {
         eventSource.close();
       }
     };
-  }, [isStreaming, currentProject?.environments]);
+  }, [isStreaming, currentProject?.environments?.[0]?.clientApiKey]);
 
   const handleSimulateBroadcast = () => {
     const randomLatency = Math.floor(Math.random() * 15) + 12;
