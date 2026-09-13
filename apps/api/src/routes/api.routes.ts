@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authRouter } from '../modules/auth/auth.routes';
 import { tenancyRouter } from '../modules/tenancy/tenancy.routes';
+import { flagRouter } from '../modules/flags/flag.routes';
 
 export const apiV1Router: Router = Router();
 
@@ -12,7 +13,7 @@ apiV1Router.get('/', (req: Request, res: Response) => {
     endpoints: {
       auth: '/api/v1/auth',
       tenancy: '/api/v1/orgs',
-      flags: '/api/v1/flags',
+      flags: '/api/v1/projects/:projectId/flags',
       evaluate: '/api/v1/evaluate',
       stream: '/api/v1/stream',
       telemetry: '/api/v1/telemetry',
@@ -22,4 +23,5 @@ apiV1Router.get('/', (req: Request, res: Response) => {
 
 // Mount module routers
 apiV1Router.use('/auth', authRouter);
+apiV1Router.use('/', flagRouter);
 apiV1Router.use('/', tenancyRouter);
