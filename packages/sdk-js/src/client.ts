@@ -22,13 +22,13 @@ export class FeatureOSClient {
   private flagsCache = new Map<string, EvaluationResult>();
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
-  private pollingTimer: NodeJS.Timeout | null = null;
+  private pollingTimer: ReturnType<typeof setTimeout> | null = null;
   private sseSource: EventSource | null = null;
-  private sseReconnectTimeout: NodeJS.Timeout | null = null;
+  private sseReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Telemetry buffer
   private telemetryQueue: TelemetryEvent[] = [];
-  private telemetryTimer: NodeJS.Timeout | null = null;
+  private telemetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   private changeListeners = new Set<FlagChangeListener>();
   private exposureListeners = new Set<ExposureListener>();

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@feature-os/config": ["packages/config/src"],
+      "@feature-os/db": ["packages/db/src"],
+      "@feature-os/sdk-js": ["packages/sdk-js/src"],
+      "@feature-os/types": ["packages/types/src"]
+    }
+  },
+  "references": [
+    { "path": "packages/types" },
+    { "path": "packages/sdk-js" },
+    { "path": "apps/api" },
+    { "path": "apps/web" },
+    { "path": "apps/client-app" }
+  ]
+}
