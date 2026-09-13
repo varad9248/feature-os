@@ -1,4 +1,8 @@
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Flag,
   Radio,
@@ -11,8 +15,10 @@ import {
   Beaker,
   Activity,
   Settings,
+  Loader2,
 } from 'lucide-react';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
+import { useAuthStore } from '@/lib/auth-store';
 
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: Activity },
@@ -29,6 +35,15 @@ const navigation = [
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { user, activeOrganization, isLoading, isAuthenticated, loadSession } = useAuthStore();
+
+  useEffect(() => {
+    void loadSession();
+  }, [loadSession]);
+
+  const currentProject = activeOrganization?.projects?.[0];
+
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       {/* Sidebar */}
@@ -71,7 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-slate-400">Project:</span>
             <span className="text-xs font-semibold text-white bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700">
-              e-commerce-web
+              {currentProject ? currentProject.name : 'Loading project...'}
             </span>
           </div>
 

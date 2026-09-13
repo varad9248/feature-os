@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import {
   Terminal,
   RotateCw,
 } from 'lucide-react';
+import { useAuthStore } from '@/lib/auth-store';
 
 interface TargetingRule {
   id: string;
@@ -42,8 +43,12 @@ export default function FlagDetailPage({
   const params = use(paramsPromise);
   const flagKey = params.key;
 
+  const { activeOrganization } = useAuthStore();
+  const currentProject = activeOrganization?.projects?.[0];
+
   const [activeEnv, setActiveEnv] = useState<'dev' | 'staging' | 'prod'>('dev');
   const [isSaved, setIsSaved] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   // Environment configs
   const [configs, setConfigs] = useState<Record<'dev' | 'staging' | 'prod', EnvConfig>>({
@@ -51,20 +56,11 @@ export default function FlagDetailPage({
       isEnabled: true,
       rolloutPercentage: 100,
       defaultValue: 'true',
-      rules: [
-        {
-          id: 'rule-1',
-          attribute: 'email',
-          operator: 'CONTAINS',
-          values: '@featureos.io',
-          variantValue: 'true',
-          priority: 0,
-        },
-      ],
+      rules: [],
     },
     staging: {
-      isEnabled: true,
-      rolloutPercentage: 50,
+      isEnabled: false,
+      rolloutPercentage: 0,
       defaultValue: 'false',
       rules: [],
     },
@@ -75,6 +71,56 @@ export default function FlagDetailPage({
       rules: [],
     },
   });
+
+  // Load flag details from API
+  useEffect(() => {
+    const fetchFlag = async () => {
+      if (!currentProject?.id) return;
+      try {
+        const token = localStorage.getItem('feature_os_access_token');
+        const res = await fetch(
+          `http://localhost:4000/api/v1/projects/${currentProject.id}/flags/${flagKey}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const flag = json.data;
+          if (flag && flag.envStates) {
+            const newConfigs = { ...configs };
+            flag.envStates.forEach((state: any) => {
+              const envKey = state.environment.key.toLowerCase();
+              const mappedKey: 'dev' | 'staging' | 'prod' | null =
+                envKey === 'development' || envKey === 'dev'
+                  ? 'dev'
+                  : envKey === 'staging'
+                  ? 'staging'
+                  : envKey === 'production' || envKey === 'prod'
+                  ? 'prod'
+                  : null;
+
+              if (mappedKey) {
+                newConfigs[mappedKey] = {
+                  isEnabled: state.isEnabled,
+                  rolloutPercentage: state.rolloutPercentage,
+                  defaultValue: String(state.defaultValue ?? 'false'),
+                  rules: state.rules || [],
+                };
+              }
+            });
+            setConfigs(newConfigs);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching flag details:', err);
+      }
+    };
+
+    void fetchFlag();
+  }, [currentProject?.id, flagKey]);
 
   // Evaluation Simulator state
   const [simUserId, setSimUserId] = useState('usr_1001');
@@ -128,9 +174,44 @@ export default function FlagDetailPage({
     });
   };
 
-  const handleSave = () => {
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+  const handleSave = async () => {
+    if (!currentProject?.id) return;
+    setSaveLoading(true);
+    try {
+      const token = localStorage.getItem('feature_os_access_token');
+      const envMap: Record<string, string> = {
+        dev: 'development',
+        staging: 'staging',
+        prod: 'production',
+      };
+      const envKey = envMap[activeEnv] || activeEnv;
+
+      const res = await fetch(
+        `http://localhost:4000/api/v1/projects/${currentProject.id}/flags/${flagKey}/environments/${envKey}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            isEnabled: currentConfig.isEnabled,
+            rolloutPercentage: currentConfig.rolloutPercentage,
+            defaultValue: currentConfig.defaultValue === 'true',
+            rules: currentConfig.rules,
+          }),
+        },
+      );
+
+      if (res.ok) {
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to save flag configuration:', err);
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   const runEvaluationSimulator = async () => {
@@ -138,52 +219,58 @@ export default function FlagDetailPage({
     const startTime = performance.now();
 
     try {
-      // Check rules
-      let matched = false;
-      let matchedVariant = currentConfig.defaultValue;
-      let reason = 'DEFAULT_FALLBACK';
+      let customAttrs = {};
+      try {
+        customAttrs = JSON.parse(simCustom);
+      } catch {}
 
-      if (!currentConfig.isEnabled) {
-        reason = 'DISABLED';
+      const envMap: Record<string, string> = {
+        dev: 'development',
+        staging: 'staging',
+        prod: 'production',
+      };
+
+      const res = await fetch('http://localhost:4000/api/v1/evaluate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-key': currentProject?.environments?.[0]?.clientApiKey || 'default-key',
+        },
+        body: JSON.stringify({
+          flagKey,
+          environmentKey: envMap[activeEnv] || activeEnv,
+          context: {
+            userId: simUserId,
+            email: simEmail,
+            country: simCountry,
+            attributes: customAttrs,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const evalData = json.data;
+        setSimResult({
+          enabled: evalData.enabled,
+          value: evalData.value,
+          reason: evalData.reason,
+          durationMs: Math.round((performance.now() - startTime) * 10) / 10,
+        });
       } else {
-        // Test rules
-        for (const rule of currentConfig.rules) {
-          let testVal = '';
-          if (rule.attribute === 'email') testVal = simEmail;
-          if (rule.attribute === 'userId') testVal = simUserId;
-          if (rule.attribute === 'country') testVal = simCountry;
-
-          if (rule.operator === 'CONTAINS' && testVal.includes(rule.values)) {
-            matched = true;
-            matchedVariant = rule.variantValue;
-            reason = 'TARGETING_MATCH';
-            break;
-          } else if (rule.operator === 'EQUALS' && testVal === rule.values) {
-            matched = true;
-            matchedVariant = rule.variantValue;
-            reason = 'TARGETING_MATCH';
-            break;
-          }
-        }
-
-        if (!matched && currentConfig.rolloutPercentage > 0) {
-          // Simple hash check for simulator preview
-          const hashVal = (simUserId.charCodeAt(0) * 17) % 100;
-          if (hashVal < currentConfig.rolloutPercentage) {
-            matched = true;
-            matchedVariant = 'true';
-            reason = 'PERCENTAGE_ROLLOUT';
-          }
-        }
+        setSimResult({
+          enabled: currentConfig.isEnabled,
+          value: currentConfig.defaultValue,
+          reason: 'DEFAULT_FALLBACK',
+          durationMs: Math.round((performance.now() - startTime) * 10) / 10,
+        });
       }
-
-      const durationMs = Math.round((performance.now() - startTime) * 10) / 10 + 1.2;
-
+    } catch {
       setSimResult({
-        enabled: currentConfig.isEnabled && (matched || currentConfig.defaultValue === 'true'),
-        value: matchedVariant,
-        reason,
-        durationMs,
+        enabled: currentConfig.isEnabled,
+        value: currentConfig.defaultValue,
+        reason: 'EVALUATION_ERROR',
+        durationMs: 1.2,
       });
     } finally {
       setSimulating(false);

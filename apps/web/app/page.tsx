@@ -3,9 +3,9 @@ import Link from 'next/link';
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-      <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold text-blue-400 mb-6">
-        <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
-        Phase 01 — Platform Foundation Operational
+      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold text-emerald-400 mb-6">
+        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        Enterprise Production Platform Active
       </div>
       <h1 className="max-w-4xl text-5xl font-extrabold tracking-tight sm:text-6xl bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
         FeatureOS
