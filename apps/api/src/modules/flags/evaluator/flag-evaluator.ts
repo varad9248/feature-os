@@ -27,6 +27,7 @@ export function evaluateFlag(
 ): EvaluationResult {
   const {
     flagKey,
+    flagType,
     isArchived,
     isEnabled,
     defaultValue,
@@ -36,12 +37,14 @@ export function evaluateFlag(
     rules,
   } = flagState;
 
+  const isBool = flagType === 'BOOLEAN';
+
   // 1. If archived or disabled, return default off
   if (isArchived || !isEnabled) {
     return {
       flagKey,
       enabled: false,
-      value: defaultValue,
+      value: isBool ? false : defaultValue,
       reason: 'DISABLED',
       version,
     };
@@ -67,7 +70,9 @@ export function evaluateFlag(
       return {
         flagKey,
         enabled: true,
-        value: rule.variantValue,
+        value: isBool
+          ? rule.variantValue === 'true' || rule.variantValue === true
+          : rule.variantValue,
         variantKey: rule.id,
         reason: 'TARGETING_MATCH',
         version,
@@ -80,7 +85,7 @@ export function evaluateFlag(
     return {
       flagKey,
       enabled: true,
-      value: defaultValue,
+      value: isBool ? true : defaultValue,
       reason: 'PERCENTAGE_ROLLOUT',
       version,
     };
@@ -90,7 +95,7 @@ export function evaluateFlag(
     return {
       flagKey,
       enabled: false,
-      value: defaultValue,
+      value: isBool ? false : defaultValue,
       reason: 'DEFAULT_FALLBACK',
       version,
     };
@@ -102,7 +107,7 @@ export function evaluateFlag(
     return {
       flagKey,
       enabled: true,
-      value: defaultValue,
+      value: isBool ? true : defaultValue,
       reason: 'PERCENTAGE_ROLLOUT',
       version,
     };
@@ -111,7 +116,7 @@ export function evaluateFlag(
   return {
     flagKey,
     enabled: false,
-    value: defaultValue,
+    value: isBool ? false : defaultValue,
     reason: 'DEFAULT_FALLBACK',
     version,
   };

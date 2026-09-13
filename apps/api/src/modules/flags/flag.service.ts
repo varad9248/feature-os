@@ -135,7 +135,7 @@ export class FlagService {
     input: UpdateFlagEnvironmentStateInput,
   ) {
     const flag = await this.getFlagDetails(projectId, flagKey);
-    const env = await prisma.environment.findUnique({
+    let env = await prisma.environment.findUnique({
       where: {
         projectId_key: {
           projectId,
@@ -145,10 +145,22 @@ export class FlagService {
     });
 
     if (!env) {
+      const allEnvs = await prisma.environment.findMany({ where: { projectId } });
+      env =
+        allEnvs.find(
+          (e) =>
+            e.id === envKey ||
+            e.key.toLowerCase() === envKey.toLowerCase() ||
+            (envKey.toLowerCase() === 'dev' && e.key.toLowerCase() === 'development') ||
+            (envKey.toLowerCase() === 'prod' && e.key.toLowerCase() === 'production')
+        ) || null;
+    }
+
+    if (!env) {
       throw new AppError(`Environment '${envKey}' not found`, 404);
     }
 
-    const state = await prisma.flagEnvironmentState.findUnique({
+    let state = await prisma.flagEnvironmentState.findUnique({
       where: {
         flagId_environmentId: {
           flagId: flag.id,
@@ -158,7 +170,16 @@ export class FlagService {
     });
 
     if (!state) {
-      throw new AppError('Flag state for this environment not found', 404);
+      state = await prisma.flagEnvironmentState.create({
+        data: {
+          flagId: flag.id,
+          environmentId: env.id,
+          isEnabled: false,
+          defaultValue: flag.type === 'BOOLEAN' ? false : '',
+          rolloutPercentage: 0,
+          version: 1,
+        },
+      });
     }
 
     const updatedState = await prisma.$transaction(async (tx) => {

@@ -311,7 +311,17 @@ export default function SdkTestPage() {
       enableRealtime: true,
       enableExposureTracking: true,
     });
-  }, [clientApiKey, userId, userEmail, userCountry]);
+  }, [clientApiKey]);
+
+  useEffect(() => {
+    void client.setContext({
+      userId,
+      custom: {
+        email: userEmail,
+        country: userCountry,
+      },
+    });
+  }, [client, userId, userEmail, userCountry]);
 
   return (
     <div className="space-y-6 max-w-6xl">

@@ -5,18 +5,23 @@ import Link from 'next/link';
 import {
   Flag,
   Radio,
-  BarChart3,
   Users,
   Bot,
   ShieldCheck,
-  ShieldAlert,
-  Activity,
   RefreshCw,
-  CheckCircle2,
   Server,
   Zap,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 interface ObservabilityOverview {
   systemStatus: string;
@@ -101,7 +106,6 @@ export default function DashboardOverviewPage() {
     return () => clearInterval(interval);
   }, [authLoading, accessToken]);
 
-
   const defaultOverview: ObservabilityOverview = {
     systemStatus: 'HEALTHY',
     prometheusScraping: true,
@@ -131,95 +135,101 @@ export default function DashboardOverviewPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Platform Health & Overview</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Realtime feature delivery state, telemetry flow, and AI autonomous supervision for{' '}
             <span className="text-white font-medium">{activeOrganization?.name || 'Workspace'}</span>.
           </p>
         </div>
 
-        <button
+        <Button
           onClick={fetchLiveStats}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white hover:bg-slate-700 transition cursor-pointer self-start sm:self-auto"
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5 self-start sm:self-auto"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link
-          href="/dashboard/flags"
-          className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-sm backdrop-blur hover:border-slate-700 transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-medium text-slate-400">
-            <span>Active Flags</span>
-            <Flag className="h-4 w-4 text-blue-400 group-hover:scale-110 transition" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-white">
-            {currentOverview.monitoredFlags}
-          </div>
-          <div className="mt-1 text-xs font-semibold text-blue-400">
-            {currentOverview.monitoredFlags} in active catalog
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">Flags evaluated across environments</div>
+        <Link href="/dashboard/flags" className="group">
+          <Card className="p-5 border-slate-800 bg-slate-900/50 hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
+              <span>Active Flags</span>
+              <Flag className="h-4 w-4 text-blue-400 group-hover:scale-110 transition" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-white font-mono">
+              {currentOverview.monitoredFlags}
+            </div>
+            <div className="mt-1">
+              <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-500/30 font-mono">
+                {currentOverview.monitoredFlags} in active catalog
+              </Badge>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">Flags evaluated across environments</div>
+          </Card>
         </Link>
 
-        <Link
-          href="/dashboard/stream"
-          className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-sm backdrop-blur hover:border-slate-700 transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-medium text-slate-400">
-            <span>Realtime Clients</span>
-            <Radio className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-white">
-            {currentOverview.activeStreams}
-          </div>
-          <div className="mt-1 text-xs font-semibold text-emerald-400">
-            {currentOverview.totalBroadcasts} SSE broadcasts
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">Active client streams receiving delta updates</div>
+        <Link href="/dashboard/stream" className="group">
+          <Card className="p-5 border-slate-800 bg-slate-900/50 hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
+              <span>Realtime Clients</span>
+              <Radio className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-white font-mono">
+              {currentOverview.activeStreams}
+            </div>
+            <div className="mt-1">
+              <Badge variant="success" className="text-[10px] font-mono">
+                {currentOverview.totalBroadcasts} SSE broadcasts
+              </Badge>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">Active client streams receiving delta updates</div>
+          </Card>
         </Link>
 
-        <Link
-          href="/dashboard/observability"
-          className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-sm backdrop-blur hover:border-slate-700 transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-medium text-slate-400">
-            <span>Cryptographic Audit Chain</span>
-            <ShieldCheck className="h-4 w-4 text-purple-400 group-hover:scale-110 transition" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-white">
-            {currentOverview.totalAuditLogs}
-          </div>
-          <div className="mt-1 text-xs font-semibold text-purple-400">
-            {currentOverview.auditChainIntegrity ? 'Chain Integrity Verified' : 'Tamper-Evident Active'}
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">SHA-256 tamper-evident merkle-linked logs</div>
+        <Link href="/dashboard/observability" className="group">
+          <Card className="p-5 border-slate-800 bg-slate-900/50 hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
+              <span>Cryptographic Audit Chain</span>
+              <ShieldCheck className="h-4 w-4 text-purple-400 group-hover:scale-110 transition" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-white font-mono">
+              {currentOverview.totalAuditLogs}
+            </div>
+            <div className="mt-1">
+              <Badge variant="outline" className="text-[10px] text-purple-400 border-purple-500/30 font-mono">
+                {currentOverview.auditChainIntegrity ? 'Chain Integrity Verified' : 'Tamper-Evident Active'}
+              </Badge>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">SHA-256 tamper-evident merkle-linked logs</div>
+          </Card>
         </Link>
 
-        <Link
-          href="/dashboard/ai-inbox"
-          className="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-sm backdrop-blur hover:border-slate-700 transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-medium text-slate-400">
-            <span>Autonomous AI Insights</span>
-            <Bot className="h-4 w-4 text-amber-400 group-hover:scale-110 transition" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-white">
-            {pendingAiCount > 0 ? `${pendingAiCount} Pending` : 'All Clear'}
-          </div>
-          <div className="mt-1 text-xs font-semibold text-amber-400">
-            {pendingAiCount > 0 ? 'Review Required' : 'Multi-Agent Swarm Idle'}
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">LangGraph 5-agent swarm recommendations</div>
+        <Link href="/dashboard/ai-inbox" className="group">
+          <Card className="p-5 border-slate-800 bg-slate-900/50 hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
+              <span>Autonomous AI Insights</span>
+              <Bot className="h-4 w-4 text-amber-400 group-hover:scale-110 transition" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-white font-mono">
+              {pendingAiCount > 0 ? `${pendingAiCount} Pending` : 'All Clear'}
+            </div>
+            <div className="mt-1">
+              <Badge variant={pendingAiCount > 0 ? 'destructive' : 'secondary'} className="text-[10px] font-mono">
+                {pendingAiCount > 0 ? 'Review Required' : 'Multi-Agent Swarm Idle'}
+              </Badge>
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">LangGraph 5-agent swarm recommendations</div>
+          </Card>
         </Link>
       </div>
 
       {/* System Status Banner */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+      <Card className="border-slate-800 bg-slate-900/40 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -250,23 +260,23 @@ export default function DashboardOverviewPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-slate-300">
+          <Badge variant="outline" className="text-slate-300 border-slate-700 bg-slate-800/80 font-normal">
             Next.js App Router (Port 3000)
-          </span>
-          <span className="rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-slate-300">
+          </Badge>
+          <Badge variant="outline" className="text-slate-300 border-slate-700 bg-slate-800/80 font-normal">
             Express Core API (Port 4000)
-          </span>
-          <span className="rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-slate-300">
+          </Badge>
+          <Badge variant="outline" className="text-slate-300 border-slate-700 bg-slate-800/80 font-normal">
             FastAPI AI Swarm (Port 8000)
-          </span>
-          <span className="rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-slate-300">
+          </Badge>
+          <Badge variant="outline" className="text-slate-300 border-slate-700 bg-slate-800/80 font-normal">
             PostgreSQL 16 + pgvector (Port 5432)
-          </span>
-          <span className="rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1 text-slate-300">
+          </Badge>
+          <Badge variant="outline" className="text-slate-300 border-slate-700 bg-slate-800/80 font-normal">
             Prometheus Metrics (/metrics)
-          </span>
+          </Badge>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

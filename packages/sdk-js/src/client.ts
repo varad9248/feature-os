@@ -221,6 +221,7 @@ export class FeatureOSClient {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': this.apiKey,
+        'x-client-key': this.apiKey,
       },
       body: JSON.stringify({
         context: this.context,
@@ -233,13 +234,14 @@ export class FeatureOSClient {
 
     const payload = (await response.json()) as {
       success: boolean;
-      data: {
-        evaluations: Record<string, EvaluationResult>;
-      };
+      data: any;
     };
 
-    if (payload.success && payload.data?.evaluations) {
-      this.applyEvaluations(payload.data.evaluations);
+    if (payload.success && payload.data) {
+      const evaluations = (payload.data.evaluations || payload.data) as Record<string, EvaluationResult>;
+      if (evaluations && typeof evaluations === 'object') {
+        this.applyEvaluations(evaluations);
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FeatureOSClient,
   FeatureOSProvider,
@@ -439,7 +439,36 @@ export default function App() {
   const [baseUrl, setBaseUrl] = useState('http://localhost:4000');
   const [mutating, setMutating] = useState(false);
 
-  // Instantiate SDK client
+  // Auto-discover active dev clientApiKey from the running backend
+  useEffect(() => {
+    const discoverDevKey = async () => {
+      try {
+        const loginRes = await fetch(`${baseUrl}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@featureos.io', password: 'password123' }),
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json();
+          const org = loginData.data?.organization;
+          const project = org?.projects?.[0];
+          const devEnv =
+            project?.environments?.find(
+              (e: any) => e.key?.toLowerCase() === 'development' || e.key?.toLowerCase() === 'dev'
+            ) || project?.environments?.[0];
+
+          if (devEnv?.clientApiKey && devEnv.clientApiKey !== apiKey) {
+            setApiKey(devEnv.clientApiKey);
+          }
+        }
+      } catch {
+        // Suppress network error
+      }
+    };
+    void discoverDevKey();
+  }, [baseUrl]);
+
+  // Instantiate SDK client once per apiKey / baseUrl
   const client = useMemo(() => {
     return new FeatureOSClient({
       apiKey,
@@ -456,7 +485,20 @@ export default function App() {
       enableRealtime: true,
       enableExposureTracking: true,
     });
-  }, [apiKey, baseUrl, selectedUser]);
+  }, [apiKey, baseUrl]);
+
+  // Update evaluation context without re-establishing SSE connections
+  useEffect(() => {
+    void client.setContext({
+      userId: selectedUser.userId,
+      email: selectedUser.email,
+      country: selectedUser.country,
+      custom: {
+        tier: selectedUser.tier,
+        betaTester: selectedUser.betaTester,
+      },
+    });
+  }, [client, selectedUser]);
 
   // Directly call the Core API to trigger a feature flag state mutation,
   // then watch the SDK update live via Server-Sent Events!

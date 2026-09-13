@@ -67,11 +67,14 @@ export class FlagController {
   static async evaluateSingle(req: Request, res: Response, next: NextFunction) {
     try {
       const apiKey =
+        (req.headers['x-api-key'] as string) ||
         (req.headers['x-client-key'] as string) ||
+        (req.headers['x-server-key'] as string) ||
+        (req.query.apiKey as string) ||
         (req.headers['authorization']?.replace('Bearer ', '') as string);
 
       if (!apiKey) {
-        throw new AppError('Missing X-Client-Key or Authorization header', 401);
+        throw new AppError('Missing API key (x-api-key, x-client-key, or Authorization header)', 401);
       }
 
       const { flagKey, context } = req.body;
@@ -85,16 +88,25 @@ export class FlagController {
   static async evaluateAll(req: Request, res: Response, next: NextFunction) {
     try {
       const apiKey =
+        (req.headers['x-api-key'] as string) ||
         (req.headers['x-client-key'] as string) ||
+        (req.headers['x-server-key'] as string) ||
+        (req.query.apiKey as string) ||
         (req.headers['authorization']?.replace('Bearer ', '') as string);
 
       if (!apiKey) {
-        throw new AppError('Missing X-Client-Key or Authorization header', 401);
+        throw new AppError('Missing API key (x-api-key, x-client-key, or Authorization header)', 401);
       }
 
       const { context, flagKeys } = req.body;
       const results = await FlagService.evaluateAll(apiKey, context, flagKeys);
-      res.status(200).json({ success: true, data: results });
+      res.status(200).json({
+        success: true,
+        data: {
+          evaluations: results,
+          ...results,
+        },
+      });
     } catch (error) {
       next(error);
     }

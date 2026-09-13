@@ -27,7 +27,7 @@ export class RedisPubSubManager {
 
   private setupListeners(): void {
     this.pubClient.on('connect', () => {
-      logger.info('Redis Pub Client connected');
+      logger.debug('Redis Pub Client connected');
       this.isConnected = true;
     });
 
@@ -36,7 +36,7 @@ export class RedisPubSubManager {
     });
 
     this.subClient.on('connect', () => {
-      logger.info('Redis Sub Client connected');
+      logger.debug('Redis Sub Client connected');
     });
 
     this.subClient.on('error', (err) => {
@@ -68,6 +68,8 @@ export class RedisPubSubManager {
     return this.pubClient.publish(channel, payloadString);
   }
 
+  private unsubscribeTimers = new Map<string, NodeJS.Timeout>();
+
   public async subscribe(
     orgId: string,
     envId: string,
@@ -75,10 +77,16 @@ export class RedisPubSubManager {
   ): Promise<() => Promise<void>> {
     const channel = this.getChannel(orgId, envId);
 
+    // Cancel pending unsubscribe if a client reconnected
+    if (this.unsubscribeTimers.has(channel)) {
+      clearTimeout(this.unsubscribeTimers.get(channel)!);
+      this.unsubscribeTimers.delete(channel);
+    }
+
     if (!this.channelSubscriptions.has(channel)) {
       this.channelSubscriptions.set(channel, new Set());
       await this.subClient.subscribe(channel);
-      logger.info({ channel }, 'Subscribed to Redis channel');
+      logger.debug({ channel }, 'Subscribed to Redis channel');
     }
 
     const listeners = this.channelSubscriptions.get(channel)!;
@@ -87,9 +95,24 @@ export class RedisPubSubManager {
     return async () => {
       listeners.delete(listener);
       if (listeners.size === 0) {
-        this.channelSubscriptions.delete(channel);
-        await this.subClient.unsubscribe(channel);
-        logger.info({ channel }, 'Unsubscribed from Redis channel');
+        // Debounce unsubscription by 10 seconds to prevent rapid connection/disconnection flapping
+        if (this.unsubscribeTimers.has(channel)) {
+          clearTimeout(this.unsubscribeTimers.get(channel)!);
+        }
+        const timer = setTimeout(async () => {
+          this.unsubscribeTimers.delete(channel);
+          const current = this.channelSubscriptions.get(channel);
+          if (!current || current.size === 0) {
+            this.channelSubscriptions.delete(channel);
+            try {
+              await this.subClient.unsubscribe(channel);
+              logger.debug({ channel }, 'Unsubscribed from Redis channel');
+            } catch (err) {
+              logger.error({ err, channel }, 'Failed to unsubscribe from Redis channel');
+            }
+          }
+        }, 10000);
+        this.unsubscribeTimers.set(channel, timer);
       }
     };
   }
