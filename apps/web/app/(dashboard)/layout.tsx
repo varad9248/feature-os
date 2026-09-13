@@ -7,6 +7,7 @@ import {
   Bot,
   GitPullRequest,
   ShieldAlert,
+  ShieldCheck,
   Beaker,
   Activity,
   Settings,
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Progressive Rollouts', href: '/dashboard/rollouts', icon: GitPullRequest },
   { name: 'Incident Center & Self-Healing', href: '/dashboard/incidents', icon: ShieldAlert },
   { name: 'A/B Experiments', href: '/dashboard/experiments', icon: Beaker },
+  { name: 'Observability & Audit Logs', href: '/dashboard/observability', icon: ShieldCheck },
   { name: 'Settings & Members', href: '/dashboard/settings', icon: Settings },
 ];
 

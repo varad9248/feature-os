@@ -7,7 +7,9 @@ from app.api.v1.ai import router as ai_router
 from app.api.v1.cohorts import router as cohorts_router
 from app.api.v1.agents import router as agents_router
 from app.api.v1.experiments import router as experiments_router
-
+from app.api.v1.memory import router as memory_router
+import prometheus_client
+from fastapi.responses import Response
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,6 +42,15 @@ app.include_router(ai_router)
 app.include_router(cohorts_router)
 app.include_router(agents_router)
 app.include_router(experiments_router)
+app.include_router(memory_router)
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    return Response(
+        content=prometheus_client.generate_latest(),
+        media_type=prometheus_client.CONTENT_TYPE_LATEST,
+    )
 
 
 

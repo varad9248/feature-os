@@ -9,6 +9,8 @@ import { agentRouter } from '../modules/agents/agent.routes';
 import { rolloutRouter } from '../modules/rollouts/rollout.routes';
 import { incidentRouter } from '../modules/incidents/incident.routes';
 import { experimentRouter } from '../modules/experiments/experiment.routes';
+import { auditRouter } from '../modules/audit/audit.routes';
+import { observabilityRouter } from '../modules/observability/observability.routes';
 
 export const apiV1Router: Router = Router();
 
@@ -29,6 +31,8 @@ apiV1Router.get('/', (req: Request, res: Response) => {
       rollouts: '/api/v1/projects/:projectId/rollouts',
       incidents: '/api/v1/projects/:projectId/incidents/breakers',
       experiments: '/api/v1/projects/:projectId/experiments',
+      audit: '/api/v1/audit',
+      observability: '/api/v1/observability/overview',
     },
   });
 });
@@ -44,6 +48,8 @@ apiV1Router.use('/', agentRouter);
 apiV1Router.use('/', rolloutRouter);
 apiV1Router.use('/', incidentRouter);
 apiV1Router.use('/', experimentRouter);
+apiV1Router.use('/', auditRouter);
+apiV1Router.use('/', observabilityRouter);
 
 
 
