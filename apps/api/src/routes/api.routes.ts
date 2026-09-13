@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authRouter } from '../modules/auth/auth.routes';
 import { tenancyRouter } from '../modules/tenancy/tenancy.routes';
 import { flagRouter } from '../modules/flags/flag.routes';
+import { streamRouter } from '../modules/realtime/stream.routes';
 
 export const apiV1Router: Router = Router();
 
@@ -24,4 +25,5 @@ apiV1Router.get('/', (req: Request, res: Response) => {
 // Mount module routers
 apiV1Router.use('/auth', authRouter);
 apiV1Router.use('/', flagRouter);
+apiV1Router.use('/', streamRouter);
 apiV1Router.use('/', tenancyRouter);

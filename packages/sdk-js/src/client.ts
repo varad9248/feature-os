@@ -1,4 +1,4 @@
-import type { EvaluationContext, EvaluationResult } from '@feature-os/types';
+import type { EvaluationContext, EvaluationResult, StreamEvent } from '@feature-os/types';
 import type {
   FeatureOSClientOptions,
   ExposureEvent,
@@ -12,10 +12,13 @@ export class FeatureOSClient {
   private context: EvaluationContext;
   private readonly enableExposureTracking: boolean;
   private readonly offlineFallback: boolean;
+  private readonly enableRealtime: boolean;
   private flagsCache = new Map<string, EvaluationResult>();
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
   private pollingTimer: NodeJS.Timeout | null = null;
+  private sseSource: EventSource | null = null;
+  private sseReconnectTimeout: NodeJS.Timeout | null = null;
 
   private changeListeners = new Set<FlagChangeListener>();
   private exposureListeners = new Set<ExposureListener>();
@@ -26,10 +29,14 @@ export class FeatureOSClient {
     this.context = options.context;
     this.enableExposureTracking = options.enableExposureTracking ?? true;
     this.offlineFallback = options.offlineFallback ?? true;
+    this.enableRealtime = options.enableRealtime ?? true;
 
     if (options.onExposure) {
       this.exposureListeners.add(options.onExposure);
     }
+
+    // Hydrate from localStorage if available (offline-first)
+    this.hydrateFromStorage();
 
     if (options.initialFlags) {
       for (const [key, value] of Object.entries(options.initialFlags)) {
@@ -51,13 +58,19 @@ export class FeatureOSClient {
     this.initPromise = this.fetchFlags()
       .then(() => {
         this.isInitialized = true;
+        if (this.enableRealtime) {
+          this.connectRealtimeStream();
+        }
       })
       .catch((err) => {
         if (!this.offlineFallback) {
           throw err;
         }
-        // If offline fallback enabled, allow app to proceed with initial/default flags
+        // If offline fallback enabled, proceed with cached flags
         this.isInitialized = true;
+        if (this.enableRealtime) {
+          this.connectRealtimeStream();
+        }
       });
 
     return this.initPromise;
@@ -143,6 +156,14 @@ export class FeatureOSClient {
       clearInterval(this.pollingTimer);
       this.pollingTimer = null;
     }
+    if (this.sseReconnectTimeout) {
+      clearTimeout(this.sseReconnectTimeout);
+      this.sseReconnectTimeout = null;
+    }
+    if (this.sseSource) {
+      this.sseSource.close();
+      this.sseSource = null;
+    }
     this.changeListeners.clear();
     this.exposureListeners.clear();
     this.flagsCache.clear();
@@ -172,16 +193,92 @@ export class FeatureOSClient {
     };
 
     if (payload.success && payload.data?.evaluations) {
-      for (const [key, evaluation] of Object.entries(payload.data.evaluations)) {
-        const previous = this.flagsCache.get(key);
-        this.flagsCache.set(key, evaluation);
+      this.applyEvaluations(payload.data.evaluations);
+    }
+  }
 
-        if (!previous || previous.value !== evaluation.value || previous.enabled !== evaluation.enabled) {
-          for (const listener of this.changeListeners) {
-            listener(key, evaluation);
+  private applyEvaluations(evaluations: Record<string, EvaluationResult>): void {
+    for (const [key, evaluation] of Object.entries(evaluations)) {
+      const previous = this.flagsCache.get(key);
+      this.flagsCache.set(key, evaluation);
+
+      if (
+        !previous ||
+        previous.value !== evaluation.value ||
+        previous.enabled !== evaluation.enabled ||
+        previous.version !== evaluation.version
+      ) {
+        for (const listener of this.changeListeners) {
+          listener(key, evaluation);
+        }
+      }
+    }
+    this.persistToStorage();
+  }
+
+  private connectRealtimeStream(): void {
+    if (typeof EventSource === 'undefined') return;
+
+    try {
+      const streamUrl = `${this.baseUrl}/api/v1/stream?apiKey=${encodeURIComponent(this.apiKey)}`;
+      this.sseSource = new EventSource(streamUrl);
+
+      this.sseSource.addEventListener('flag_update', (event: MessageEvent) => {
+        try {
+          const streamEvent = JSON.parse(event.data) as StreamEvent<{ flagKey: string }>;
+          // Refetch flags for the current context to ensure sticky rules and rollouts recalculate cleanly
+          void this.fetchFlags();
+        } catch {
+          // Suppress parsing error
+        }
+      });
+
+      this.sseSource.addEventListener('full_sync', () => {
+        void this.fetchFlags();
+      });
+
+      this.sseSource.onerror = () => {
+        if (this.sseSource) {
+          this.sseSource.close();
+          this.sseSource = null;
+        }
+        // Reconnect after 3 seconds
+        this.sseReconnectTimeout = setTimeout(() => {
+          this.connectRealtimeStream();
+        }, 3000);
+      };
+    } catch {
+      // Suppress connection failure, client continues in offline mode
+    }
+  }
+
+  private hydrateFromStorage(): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const cached = window.localStorage.getItem(`featureos_flags_${this.apiKey}`);
+        if (cached) {
+          const parsed = JSON.parse(cached) as Record<string, EvaluationResult>;
+          for (const [k, v] of Object.entries(parsed)) {
+            this.flagsCache.set(k, v);
           }
         }
       }
+    } catch {
+      // Storage unavailable or disabled
+    }
+  }
+
+  private persistToStorage(): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const obj: Record<string, EvaluationResult> = {};
+        for (const [k, v] of this.flagsCache.entries()) {
+          obj[k] = v;
+        }
+        window.localStorage.setItem(`featureos_flags_${this.apiKey}`, JSON.stringify(obj));
+      }
+    } catch {
+      // Storage quota exceeded or disabled
     }
   }
 

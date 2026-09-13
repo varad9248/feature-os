@@ -68,3 +68,11 @@ flagRouter.put(
   validateRequest({ body: UpdateFlagEnvironmentStateSchema }),
   FlagController.updateFlagEnvironmentState,
 );
+
+flagRouter.patch(
+  '/projects/:projectId/flags/:flagKey/environments/:envKey',
+  authenticateJWT,
+  requirePermission(Permission.FLAG_TOGGLE),
+  validateRequest({ body: UpdateFlagEnvironmentStateSchema }),
+  FlagController.updateFlagEnvironmentState,
+);

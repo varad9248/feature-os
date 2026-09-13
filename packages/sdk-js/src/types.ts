@@ -19,6 +19,7 @@ export interface FeatureOSClientOptions {
   onExposure?: (event: ExposureEvent) => void;
   initialFlags?: Record<string, EvaluationResult>;
   offlineFallback?: boolean;
+  enableRealtime?: boolean;
 }
 
 export interface FeatureOSServerOptions {

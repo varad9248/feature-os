@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import prisma, { FlagType } from '@feature-os/db';
 import {
   CreateFlagInput,
@@ -7,6 +8,7 @@ import {
   EvaluationResult,
 } from '@feature-os/types';
 import { evaluateFlag, EvaluatableFlagState } from './evaluator/flag-evaluator';
+import { redisPubSub } from '../realtime/redis-pubsub';
 import { AppError } from '../../middleware/error.middleware';
 
 export class FlagService {
@@ -159,7 +161,7 @@ export class FlagService {
       throw new AppError('Flag state for this environment not found', 404);
     }
 
-    return prisma.$transaction(async (tx) => {
+    const updatedState = await prisma.$transaction(async (tx) => {
       // If rules provided, replace existing rules
       if (input.rules) {
         await tx.targetingRule.deleteMany({
@@ -197,6 +199,30 @@ export class FlagService {
         },
       });
     });
+
+    // Broadcast update via Redis Pub/Sub for sub-50ms delta distribution
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (project) {
+      void redisPubSub.publishStreamEvent({
+        eventId: crypto.randomUUID(),
+        type: 'FLAG_UPDATE',
+        orgId: project.organizationId,
+        projectId,
+        environmentId: env.id,
+        version: updatedState.version,
+        timestamp: Date.now(),
+        payload: {
+          flagKey,
+          isEnabled: updatedState.isEnabled,
+          defaultValue: updatedState.defaultValue,
+          rolloutPercentage: updatedState.rolloutPercentage,
+          rules: updatedState.rules,
+          version: updatedState.version,
+        },
+      });
+    }
+
+    return updatedState;
   }
 
   // ----------------------------------------------------
