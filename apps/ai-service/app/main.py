@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.api.v1.health import router as health_router
 from app.api.v1.ai import router as ai_router
+from app.api.v1.cohorts import router as cohorts_router
 
 
 @asynccontextmanager
@@ -34,6 +35,7 @@ app.add_middleware(
 # Routers
 app.include_router(health_router)
 app.include_router(ai_router)
+app.include_router(cohorts_router)
 
 
 if __name__ == "__main__":
