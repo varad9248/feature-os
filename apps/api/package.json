@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@apollo/server": "^4.11.3",
+    "@clickhouse/client": "^1.23.1",
     "@feature-os/config": "workspace:*",
     "@feature-os/db": "workspace:*",
     "@feature-os/types": "workspace:*",
@@ -24,6 +25,7 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.5.0",
     "jsonwebtoken": "^9.0.3",
+    "kafkajs": "^2.2.4",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "prom-client": "^15.1.3",

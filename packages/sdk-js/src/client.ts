@@ -1,4 +1,10 @@
-import type { EvaluationContext, EvaluationResult, StreamEvent } from '@feature-os/types';
+import {
+  type EvaluationContext,
+  type EvaluationResult,
+  type StreamEvent,
+  type TelemetryEvent,
+  TelemetryEventType,
+} from '@feature-os/types';
 import type {
   FeatureOSClientOptions,
   ExposureEvent,
@@ -19,6 +25,10 @@ export class FeatureOSClient {
   private pollingTimer: NodeJS.Timeout | null = null;
   private sseSource: EventSource | null = null;
   private sseReconnectTimeout: NodeJS.Timeout | null = null;
+
+  // Telemetry buffer
+  private telemetryQueue: TelemetryEvent[] = [];
+  private telemetryTimer: NodeJS.Timeout | null = null;
 
   private changeListeners = new Set<FlagChangeListener>();
   private exposureListeners = new Set<ExposureListener>();
@@ -49,6 +59,11 @@ export class FeatureOSClient {
         void this.fetchFlags();
       }, options.pollingIntervalMs);
     }
+
+    // Auto-flush telemetry every 5 seconds
+    this.telemetryTimer = setInterval(() => {
+      void this.flushTelemetry();
+    }, 5000);
   }
 
   public async initialize(): Promise<void> {
@@ -129,6 +144,32 @@ export class FeatureOSClient {
     return result;
   }
 
+  public track(
+    eventName: string,
+    properties?: Record<string, unknown>,
+    numericValue?: number
+  ): void {
+    this.enqueueTelemetry({
+      eventType: TelemetryEventType.CLICK,
+      userId: this.context.userId,
+      timestamp: new Date().toISOString(),
+      numericValue,
+      metadata: { eventName, ...properties },
+    });
+  }
+
+  public trackError(flagKey: string, error: Error | string): void {
+    this.enqueueTelemetry({
+      eventType: TelemetryEventType.ERROR,
+      flagKey,
+      userId: this.context.userId,
+      timestamp: new Date().toISOString(),
+      errorMessage: typeof error === 'string' ? error : error.message,
+      stackTrace: typeof error === 'string' ? '' : error.stack,
+      metadata: {},
+    });
+  }
+
   public getAllFlags(): Record<string, EvaluationResult> {
     const output: Record<string, EvaluationResult> = {};
     for (const [key, value] of this.flagsCache.entries()) {
@@ -156,6 +197,10 @@ export class FeatureOSClient {
       clearInterval(this.pollingTimer);
       this.pollingTimer = null;
     }
+    if (this.telemetryTimer) {
+      clearInterval(this.telemetryTimer);
+      this.telemetryTimer = null;
+    }
     if (this.sseReconnectTimeout) {
       clearTimeout(this.sseReconnectTimeout);
       this.sseReconnectTimeout = null;
@@ -164,6 +209,7 @@ export class FeatureOSClient {
       this.sseSource.close();
       this.sseSource = null;
     }
+    void this.flushTelemetry();
     this.changeListeners.clear();
     this.exposureListeners.clear();
     this.flagsCache.clear();
@@ -226,7 +272,7 @@ export class FeatureOSClient {
       this.sseSource.addEventListener('flag_update', (event: MessageEvent) => {
         try {
           const streamEvent = JSON.parse(event.data) as StreamEvent<{ flagKey: string }>;
-          // Refetch flags for the current context to ensure sticky rules and rollouts recalculate cleanly
+          // Refetch flags for the current context to recalculate sticky rules and rollouts cleanly
           void this.fetchFlags();
         } catch {
           // Suppress parsing error
@@ -282,6 +328,40 @@ export class FeatureOSClient {
     }
   }
 
+  private enqueueTelemetry(event: TelemetryEvent): void {
+    this.telemetryQueue.push(event);
+    if (this.telemetryQueue.length >= 20) {
+      void this.flushTelemetry();
+    }
+  }
+
+  public async flushTelemetry(): Promise<void> {
+    if (this.telemetryQueue.length === 0) return;
+
+    const batch = [...this.telemetryQueue];
+    this.telemetryQueue = [];
+
+    try {
+      await fetch(`${this.baseUrl}/api/v1/telemetry/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+        body: JSON.stringify({
+          environmentKey: 'development',
+          sentAt: new Date().toISOString(),
+          events: batch,
+        }),
+      });
+    } catch {
+      // If network fails, re-queue up to 100 events
+      if (this.telemetryQueue.length < 100) {
+        this.telemetryQueue.unshift(...batch);
+      }
+    }
+  }
+
   private trackExposure(result: EvaluationResult): void {
     const exposure: ExposureEvent = {
       flagKey: result.flagKey,
@@ -293,6 +373,7 @@ export class FeatureOSClient {
       timestamp: Date.now(),
     };
 
+    // 1. Notify client exposure listeners
     for (const listener of this.exposureListeners) {
       try {
         listener(exposure);
@@ -300,5 +381,19 @@ export class FeatureOSClient {
         // Suppress listener errors
       }
     }
+
+    // 2. Queue into ClickHouse / Kafka analytical pipeline
+    this.enqueueTelemetry({
+      eventType: TelemetryEventType.EXPOSURE,
+      flagKey: result.flagKey,
+      variantKey: result.variantKey || 'control',
+      userId: this.context.userId,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        enabled: result.enabled,
+        reason: result.reason,
+        version: result.version,
+      },
+    });
   }
 }
