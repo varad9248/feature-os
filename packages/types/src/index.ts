@@ -3,3 +3,4 @@ export * from './flags';
 export * from './realtime';
 export * from './telemetry';
 export * from './ai';
+export * from './experiments';

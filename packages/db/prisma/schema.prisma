@@ -58,6 +58,13 @@ enum SuggestionStatus {
   EXECUTED
 }
 
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  CONCLUDED
+}
+
 // ----------------------------------------------------
 // Tenancy & Identity Models
 // ----------------------------------------------------
@@ -171,9 +178,11 @@ model FeatureFlag {
   envStates      FlagEnvironmentState[]
   circuitBreaker CircuitBreaker?
   suggestions    AISuggestion[]
+  experiments    Experiment[]
 
   @@unique([projectId, key])
 }
+
 
 model FlagEnvironmentState {
   id                String       @id @default(uuid())
@@ -313,3 +322,37 @@ model IncidentMemory {
 
   organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
+
+// ----------------------------------------------------
+// Experimentation & Bayesian Statistical Models
+// ----------------------------------------------------
+
+model Experiment {
+  id                   String               @id @default(uuid())
+  flagId               String
+  name                 String
+  hypothesis           String
+  primaryMetric        String
+  status               ExperimentStatus     @default(DRAFT)
+  winnerVariant        String?
+  startedAt            DateTime?
+  endedAt              DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  flag                 FeatureFlag          @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  variants             ExperimentVariant[]
+}
+
+model ExperimentVariant {
+  id                   String               @id @default(uuid())
+  experimentId         String
+  key                  String
+  name                 String
+  weight               Float                @default(50.0)
+  sampleCount          Int                  @default(0)
+  conversions          Int                  @default(0)
+
+  experiment           Experiment           @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+}
+

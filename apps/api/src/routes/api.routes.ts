@@ -8,6 +8,7 @@ import { cohortRouter } from '../modules/cohorts/cohort.routes';
 import { agentRouter } from '../modules/agents/agent.routes';
 import { rolloutRouter } from '../modules/rollouts/rollout.routes';
 import { incidentRouter } from '../modules/incidents/incident.routes';
+import { experimentRouter } from '../modules/experiments/experiment.routes';
 
 export const apiV1Router: Router = Router();
 
@@ -27,6 +28,7 @@ apiV1Router.get('/', (req: Request, res: Response) => {
       agents: '/api/v1/projects/:projectId/agents/evaluate',
       rollouts: '/api/v1/projects/:projectId/rollouts',
       incidents: '/api/v1/projects/:projectId/incidents/breakers',
+      experiments: '/api/v1/projects/:projectId/experiments',
     },
   });
 });
@@ -41,6 +43,7 @@ apiV1Router.use('/', cohortRouter);
 apiV1Router.use('/', agentRouter);
 apiV1Router.use('/', rolloutRouter);
 apiV1Router.use('/', incidentRouter);
+apiV1Router.use('/', experimentRouter);
 
 
 
