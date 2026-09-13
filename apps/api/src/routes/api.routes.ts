@@ -7,6 +7,7 @@ import { telemetryRouter } from '../modules/telemetry/telemetry.routes';
 import { cohortRouter } from '../modules/cohorts/cohort.routes';
 import { agentRouter } from '../modules/agents/agent.routes';
 import { rolloutRouter } from '../modules/rollouts/rollout.routes';
+import { incidentRouter } from '../modules/incidents/incident.routes';
 
 export const apiV1Router: Router = Router();
 
@@ -25,6 +26,7 @@ apiV1Router.get('/', (req: Request, res: Response) => {
       cohorts: '/api/v1/projects/:projectId/cohorts/discover',
       agents: '/api/v1/projects/:projectId/agents/evaluate',
       rollouts: '/api/v1/projects/:projectId/rollouts',
+      incidents: '/api/v1/projects/:projectId/incidents/breakers',
     },
   });
 });
@@ -38,6 +40,8 @@ apiV1Router.use('/', tenancyRouter);
 apiV1Router.use('/', cohortRouter);
 apiV1Router.use('/', agentRouter);
 apiV1Router.use('/', rolloutRouter);
+apiV1Router.use('/', incidentRouter);
+
 
 
 
