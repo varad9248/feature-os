@@ -23,7 +23,7 @@ async function main() {
       email: 'admin@featureos.io',
       name: 'System Admin',
       // bcrypt hash for 'password123'
-      passwordHash: '$2a$10$wN1QyZtZqD53m5m5fG6F8.4Cg0y83iY9R1X4lM7r8q7yM6Z9g8iOm',
+      passwordHash: '$2b$10$fPcQU1Y9ZjLfsSo7d9UWZePuD0.WkuEQ9tOLMY3yLSfcOHhjUy1Fq',
       isVerified: true,
     },
   });
