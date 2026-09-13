@@ -1,0 +1,13 @@
+node_modules
+.pnpm-store
+.next
+dist
+build
+.git
+.turbo
+*.log
+.env
+.env.local
+.venv
+__pycache__
+scratch

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: featureos-config
+  namespace: feature-os
+data:
+  NODE_ENV: "production"
+  PORT: "4000"
+  REDIS_HOST: "featureos-redis"
+  REDIS_PORT: "6379"
+  KAFKA_BROKERS: "featureos-kafka:9092"
+  CLICKHOUSE_HOST: "http://featureos-clickhouse:8123"
+  CLICKHOUSE_DB: "featureos_analytics"
+  AI_SERVICE_URL: "http://featureos-ai-service:8000"
+  CORS_ORIGINS: "https://featureos.io,http://localhost:3000"
