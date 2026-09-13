@@ -1,0 +1,34 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "scope-enum": [
+      2,
+      "always",
+      [
+        "monorepo",
+        "auth",
+        "tenancy",
+        "flags",
+        "evaluator",
+        "sse",
+        "telemetry",
+        "analytics",
+        "cohorts",
+        "agents",
+        "rollouts",
+        "circuit-breaker",
+        "experiments",
+        "observability",
+        "memory",
+        "infra",
+        "db",
+        "sdk",
+        "api",
+        "web",
+        "ai-service",
+        "types",
+        "config"
+      ]
+    ]
+  }
+}

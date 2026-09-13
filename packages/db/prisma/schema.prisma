@@ -1,0 +1,315 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  DEVELOPER
+  PRODUCT_MANAGER
+  SRE
+  VIEWER
+}
+
+enum FlagType {
+  BOOLEAN
+  MULTIVARIATE
+  JSON
+}
+
+enum RolloutStrategyType {
+  PERCENTAGE
+  CANARY
+  RING
+  REGIONAL
+}
+
+enum RolloutStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  ROLLED_BACK
+}
+
+enum BreakerState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+
+enum SuggestionType {
+  EXCLUSION_RULE
+  ROLLBACK
+  ROLLOUT_STEP
+  WINNER_PROMOTION
+}
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+}
+
+// ----------------------------------------------------
+// Tenancy & Identity Models
+// ----------------------------------------------------
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  avatarUrl     String?
+  isVerified    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  memberships   Member[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String
+  tokenHash    String    @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id           String    @id @default(uuid())
+  name         String
+  slug         String    @unique
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  projects     Project[]
+  members      Member[]
+  cohorts      Cohort[]
+  suggestions  AISuggestion[]
+  auditLogs    AuditLog[]
+  incidents    IncidentMemory[]
+}
+
+model Member {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String
+  role           Role         @default(DEVELOPER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Project {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  key            String
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  environments   Environment[]
+  flags          FeatureFlag[]
+
+  @@unique([organizationId, key])
+}
+
+model Environment {
+  id             String       @id @default(uuid())
+  projectId      String
+  name           String
+  key            String
+  clientApiKey   String       @unique @default(uuid())
+  serverApiKey   String       @unique @default(uuid())
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  flagStates     FlagEnvironmentState[]
+
+  @@unique([projectId, key])
+}
+
+// ----------------------------------------------------
+// Feature Flag & Targeting Models
+// ----------------------------------------------------
+
+model FeatureFlag {
+  id             String       @id @default(uuid())
+  projectId      String
+  key            String
+  name           String
+  description    String?
+  type           FlagType     @default(BOOLEAN)
+  tags           String[]     @default([])
+  isArchived     Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  envStates      FlagEnvironmentState[]
+  circuitBreaker CircuitBreaker?
+  suggestions    AISuggestion[]
+
+  @@unique([projectId, key])
+}
+
+model FlagEnvironmentState {
+  id                String       @id @default(uuid())
+  flagId            String
+  environmentId     String
+  isEnabled         Boolean      @default(false)
+  defaultValue      Json         @default("false")
+  rolloutPercentage Int          @default(100)
+  version           Int          @default(1)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  flag              FeatureFlag  @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  environment       Environment  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  rules             TargetingRule[]
+  rolloutSchedule   RolloutSchedule?
+
+  @@unique([flagId, environmentId])
+}
+
+model TargetingRule {
+  id                   String               @id @default(uuid())
+  flagEnvStateId       String
+  priority             Int                  @default(0)
+  attribute            String
+  operator             String
+  values               Json
+  variantValue         Json
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  flagEnvState         FlagEnvironmentState @relation(fields: [flagEnvStateId], references: [id], onDelete: Cascade)
+}
+
+// ----------------------------------------------------
+// Progressive Rollouts & Reliability Models
+// ----------------------------------------------------
+
+model RolloutSchedule {
+  id                   String               @id @default(uuid())
+  flagEnvStateId       String               @unique
+  strategy             RolloutStrategyType  @default(PERCENTAGE)
+  status               RolloutStatus        @default(DRAFT)
+  currentStep          Int                  @default(0)
+  healthScore          Float                @default(1.0)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  flagEnvState         FlagEnvironmentState @relation(fields: [flagEnvStateId], references: [id], onDelete: Cascade)
+  steps                RolloutStep[]
+}
+
+model RolloutStep {
+  id                   String               @id @default(uuid())
+  scheduleId           String
+  stepNumber           Int
+  percentage           Int
+  durationMinutes      Int                  @default(60)
+  passed               Boolean              @default(false)
+
+  schedule             RolloutSchedule      @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+}
+
+model CircuitBreaker {
+  id                   String               @id @default(uuid())
+  flagId               String               @unique
+  state                BreakerState         @default(CLOSED)
+  failureThreshold     Float                @default(0.05)
+  cooldownSeconds      Int                  @default(60)
+  lastTrippedAt        DateTime?
+  updatedAt            DateTime             @updatedAt
+
+  flag                 FeatureFlag          @relation(fields: [flagId], references: [id], onDelete: Cascade)
+}
+
+// ----------------------------------------------------
+// AI Discovery, Suggestions & Memory Models
+// ----------------------------------------------------
+
+model Cohort {
+  id                   String               @id @default(uuid())
+  organizationId       String
+  name                 String
+  description          String?
+  ruleFilter           Json
+  confidenceScore      Float
+  size                 Int
+  severity             String               @default("INFO")
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model AISuggestion {
+  id                   String               @id @default(uuid())
+  organizationId       String
+  flagId               String
+  type                 SuggestionType
+  rationale            String
+  confidence           Float
+  status               SuggestionStatus     @default(PENDING)
+  suggestedAction      Json
+  thoughtTrace         Json                 @default("[]")
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  flag                 FeatureFlag          @relation(fields: [flagId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id                   String               @id @default(uuid())
+  organizationId       String
+  userId               String?
+  action               String
+  entityType           String
+  entityId             String
+  beforeState          Json?
+  afterState           Json?
+  hash                 String
+  createdAt            DateTime             @default(now())
+
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model IncidentMemory {
+  id                   String               @id @default(uuid())
+  organizationId       String
+  flagKey              String
+  summary              String
+  rootCause            String?
+  resolutionDetails    String?
+  metadata             Json                 @default("{}")
+  createdAt            DateTime             @default(now())
+
+  organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}

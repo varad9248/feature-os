@@ -1,0 +1,32 @@
+{
+  "name": "feature-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-Native Feature Management & Autonomous Rollout Platform",
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:api": "pnpm --filter @feature-os/api dev",
+    "dev:web": "pnpm --filter @feature-os/web dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rimraf node_modules",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "db:migrate": "pnpm --filter @feature-os/db migrate:dev",
+    "db:generate": "pnpm --filter @feature-os/db generate",
+    "db:seed": "pnpm --filter @feature-os/db seed"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.7.1",
+    "@commitlint/config-conventional": "^19.7.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.5.3",
+    "rimraf": "^6.0.1",
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3"
+  }
+}
