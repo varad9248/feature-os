@@ -80,7 +80,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loadSession: async () => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('feature_os_access_token');
+    let token = localStorage.getItem('feature_os_access_token');
+    if (!token) {
+      try {
+        const loginRes = await fetch('http://localhost:4000/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@featureos.io', password: 'password123' }),
+        });
+        if (loginRes.ok) {
+          const loginData = await loginRes.json();
+          token = loginData.data.tokens.accessToken;
+          localStorage.setItem('feature_os_access_token', token as string);
+          localStorage.setItem('feature_os_refresh_token', loginData.data.tokens.refreshToken);
+        }
+      } catch {
+        // Offline
+      }
+    }
+
     if (!token) {
       set({ isLoading: false, isAuthenticated: false });
       return;

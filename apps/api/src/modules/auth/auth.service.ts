@@ -92,7 +92,15 @@ export class AuthService {
       include: {
         memberships: {
           include: {
-            organization: true,
+            organization: {
+              include: {
+                projects: {
+                  include: {
+                    environments: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

@@ -16,6 +16,7 @@ import {
   Activity,
   Settings,
   Loader2,
+  Code2,
 } from 'lucide-react';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { useAuthStore } from '@/lib/auth-store';
@@ -23,6 +24,7 @@ import { useAuthStore } from '@/lib/auth-store';
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: Activity },
   { name: 'Feature Flags', href: '/dashboard/flags', icon: Flag },
+  { name: 'SDK Test Playground', href: '/dashboard/sdk-test', icon: Code2 },
   { name: 'Live Stream', href: '/dashboard/stream', icon: Radio },
   { name: 'Telemetry & Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'AI Cohort Discovery', href: '/dashboard/cohorts', icon: Users },

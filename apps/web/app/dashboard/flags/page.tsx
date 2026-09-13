@@ -40,7 +40,7 @@ interface FeatureFlagItem {
 }
 
 export default function FlagsDashboardPage() {
-  const { activeOrganization } = useAuthStore();
+  const { activeOrganization, isLoading: authLoading, loadSession } = useAuthStore();
   const currentProject = activeOrganization?.projects?.[0];
 
   const [flags, setFlags] = useState<FeatureFlagItem[]>([]);
@@ -59,7 +59,10 @@ export default function FlagsDashboardPage() {
   const [newTagInput, setNewTagInput] = useState('');
 
   const fetchFlags = async () => {
-    if (!currentProject?.id) return;
+    if (!currentProject?.id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -85,10 +88,15 @@ export default function FlagsDashboardPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     if (currentProject?.id) {
       void fetchFlags();
+    } else {
+      void loadSession().finally(() => {
+        setLoading(false);
+      });
     }
-  }, [currentProject?.id]);
+  }, [currentProject?.id, authLoading, loadSession]);
 
   const allTags = ['ALL', ...Array.from(new Set(flags.flatMap((f) => f.tags || [])))];
 
